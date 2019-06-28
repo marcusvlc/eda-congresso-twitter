@@ -1,5 +1,6 @@
 ---
-title: "REPLACE ME"
+title: "Análise dos twitteiros do congresso/senado utilizando regressão linear"
+author: "Marcus Vinicius L. Costa"
 output:
     html_document:
     df_print: paged
@@ -7,7 +8,11 @@ theme: sandstone
 ---
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(openintro)
 library(tidyverse)
+library(ggbeeswarm)
+library(modelr)
+library(broom)
 source(here::here("code/lib.R"))
 theme_set(theme_bw())
 ```
@@ -15,3 +20,149 @@ theme_set(theme_bw())
 ```{r read}
 atividade = read_projectdata()
 ```
+
+### Filtrando os dados...
+
+Primeiramente, faz-se necessário filtrar os parlamentares que não possuem twitter, para que essa informação não prejudique a regressão linear.
+```{r}
+
+atividade_twitter = atividade %>% filter(!is.na(seguidores))
+
+```
+
+### 1. Qual a relação entre as características da atuação do parlamentar e o engajamento total que ele obtém no twitter? 
+
+Para responder essa pergunta, primeiramente iremos plotar um gráfico de pontos para visualizar a reta de regressão entre essas duas variáveis diretamente, sem nenhum tratamento.
+
+
+## Caracteristica SEGUE vs ENGAJAMENTO TOTAL
+
+```{r}
+atividade_twitter %>% ggplot(aes(x = segue, y = engaj_total)) + geom_point() + scale_x_log10() + scale_y_log10() + geom_smooth(method = "lm", se = FALSE)
+```
+Apenas com a visualização, podemos ver que esse modelo gera uma reta que separa muito bem os pontos, no entanto, precisamos de dados para confirmar se essas variaveis conseguem se explicar bem.
+
+
+```{r}
+
+atividade_twitter = atividade_twitter %>% mutate(log_segue = log10(segue), log_engaj_total = log10(engaj_total))
+
+atividade_twitter = atividade_twitter %>% filter(log_segue != -Inf, log_engaj_total != -Inf)
+
+modelo_segue <- lm(log_engaj_total ~ log_segue , 
+          data = atividade_twitter)
+tidy(modelo_segue)
+glance(modelo_segue)
+```
+Aqui nós tratamos os dados antes para se livrar de algumas execções (tendendo a infinito) e montamos o modelo com base na representação em log10 das variáveis segue e engaj_total.
+
+O resultado foi o seguinte:
+
+log10(Engajamento total) = 2.05 + 0.6 * log10(segue)
+R² = 0.06451474
+
+Ao analisar o R², percebemos que a variável segue explica pouco a variável engajamento total (cerca de 6% apenas), logo, utilizá-la isoladamente pode não ser uma boa idéia.
+
+
+## Caracteristica SEGUIDORES vs ENGAJAMENTO TOTAL
+
+```{r}
+atividade_twitter %>% ggplot(aes(x = seguidores, y = engaj_total)) + geom_point() + scale_x_log10() + scale_y_log10() + geom_smooth(method = "lm", se = FALSE)
+```
+Apenas com a visualização da reta de regressão, podemos ter indicios que a quantidade de seguidores explica bem o engajamento total daquele parlamentar. Vamos aos dados para confirmar essa tese.
+
+```{r}
+atividade_twitter = atividade_twitter %>% mutate(log_seguidores = log10(seguidores))
+
+atividade_twitter = atividade_twitter %>% filter(log_seguidores != -Inf)
+
+modelo_seguidores <- lm(log_engaj_total ~ log_seguidores , 
+          data = atividade_twitter)
+tidy(modelo_seguidores)
+glance(modelo_seguidores)
+
+```
+Da mesma maneira que a análise anterior, foi-se tratado os dados para utilizar a escala de log10, e também eliminamos algumas representações indesejadas (-inf)
+
+O resultado foi o seguinte:
+
+log10(Engajamento Total) = -0.26 + 1.0 * log10(seguidores)
+R² = 0.37
+
+Para a variavel seguidores, podemos ver uma melhora consideravel, notando que a mesma explica 37% da variavel engajamento total.
+
+## Caracteristica Tuites vs ENGAJAMENTO TOTAL
+
+```{r}
+atividade_twitter %>% ggplot(aes(x = n_proprio, y = engaj_total)) + geom_point()  + geom_smooth(method = "lm", se = FALSE) + scale_y_log10() + scale_x_log10()
+```
+Nesse gráfico, estamos trabalhando agora com a variável n_proprio (que diz a quantidade de tuites autorais daquele parlamentar) e podemos ver inicialmente um bom "fit" da reta de regressão nos dados, vamos aos números.
+
+```{r}
+
+atividade_twitter = atividade_twitter %>% mutate(log_n_proprio = log10(n_proprio))
+
+atividade_twitter = atividade_twitter %>% filter(log_n_proprio != -Inf)
+
+modelo_nproprio <- lm(log_engaj_total ~ log_n_proprio , 
+          data = atividade_twitter)
+tidy(modelo_nproprio)
+glance(modelo_nproprio)
+
+
+```
+Para essa variável, o mesmo tratamento também foi realizado: Criação da mesma na escala logarítima e filtro de números tendendo a infinito.
+
+O modelo obtido foi:
+
+log10(Engajamento Total) = 0.5 + 1.7 * log10(n_proprio)
+R² = 0.45
+
+Para a variavel n_proprio, podemos ver uma taxa bastante alta de explicação da variável engajamento total, sendo cerca de 45%.
+
+### Combinando as caracteristicas para regressão múltipla
+
+Após analisar cada caracteristica e sua relação com o engajamento total separadamente, foi-se percebido que algumas, mesmo separadas, podem gerar um modelo que tem uma boa capacidade de explicação, porém, agora iremos combinar todas essas caracteristicas numa regressão múltipla a fim de perceber se as caracteristicas individuais de um parlamentar realmente explicam bem o seu engajamento total.
+
+
+
+```{r}
+
+modelo_caracteristicas <- lm(log_engaj_total ~ log_n_proprio + log_seguidores + log_segue , 
+          data = atividade_twitter)
+tidy(modelo_caracteristicas)
+glance(modelo_caracteristicas)
+
+```
+Modelo obtido com a regressão linear múltipla de n_proprio, seguidores e segue na tentativa de explicar a variável engajamento total:
+
+log10(Engajamento Total) = -1.15 + 1.3 * log10(n_proprio) + 0.7 * log10(seguidores) - 0.14 * log10(segue)
+R² = 0.6120782
+
+Nessa equação, podemos confirmar o que obtivemos anteriormente, que a variável n_proprio é a que, separadamente, melhor explica os dados, já que, seu coeficiente de multiplicação obtido (1.3) foi o maior entre os demais, logo, ela irá ter uma maior influência no crescimento do engajamento total.
+
+E para o R², obtivemos o valor de 0.6120782, o que nos diz que, as variáveis combinadas numa regressão múltipla irão explicar cerca de 61% da variável engajamento total, o que nos da uma boa taxa de precisão, porém, é válido lembrar que nem todas as características de um parlamentar foram colocadas nessa análise, logo, podemos falar apenas sobre as variáveis que foram colocados em jogo, mas esse valor pode melhorar ou piorar conforme outras características únicas de um parlamentar forem abordadas.
+
+### 2. Qual a relação entre as características da atuação do parlamentar e o *engajamento mediano* que ele obtém no twitter? 
+
+
+```{r}
+
+atividade_twitter = atividade_twitter %>% mutate(log_engaj_mediano = log10(engaj_mediano))
+
+atividade_twitter = atividade_twitter %>% filter(log_engaj_mediano != -Inf)
+
+modelo_mediano <- lm(log_engaj_mediano ~ log_n_proprio + log_seguidores + log_segue , 
+          data = atividade_twitter)
+tidy(modelo_caracteristicas)
+glance(modelo_caracteristicas)
+
+
+```
+Agora temos o mesmo cenário, utilizar as características de um parlamentar para explicar uma variável, a única diferença é que nossa variável de interesse agora é o engajamento mediano, e não o total.
+
+
+
+
+
+
