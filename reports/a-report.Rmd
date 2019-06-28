@@ -40,6 +40,7 @@ Para responder essa pergunta, primeiramente iremos plotar um gráfico de pontos 
 ```{r}
 atividade_twitter %>% ggplot(aes(x = segue, y = engaj_total)) + geom_point() + scale_x_log10() + scale_y_log10() + geom_smooth(method = "lm", se = FALSE)
 ```
+
 Apenas com a visualização, podemos ver que esse modelo gera uma reta que separa muito bem os pontos, no entanto, precisamos de dados para confirmar se essas variaveis conseguem se explicar bem.
 
 
@@ -69,6 +70,7 @@ Ao analisar o R², percebemos que a variável segue explica pouco a variável en
 ```{r}
 atividade_twitter %>% ggplot(aes(x = seguidores, y = engaj_total)) + geom_point() + scale_x_log10() + scale_y_log10() + geom_smooth(method = "lm", se = FALSE)
 ```
+
 Apenas com a visualização da reta de regressão, podemos ter indicios que a quantidade de seguidores explica bem o engajamento total daquele parlamentar. Vamos aos dados para confirmar essa tese.
 
 ```{r}
@@ -96,6 +98,7 @@ Para a variavel seguidores, podemos ver uma melhora consideravel, notando que a 
 ```{r}
 atividade_twitter %>% ggplot(aes(x = n_proprio, y = engaj_total)) + geom_point()  + geom_smooth(method = "lm", se = FALSE) + scale_y_log10() + scale_x_log10()
 ```
+
 Nesse gráfico, estamos trabalhando agora com a variável n_proprio (que diz a quantidade de tuites autorais daquele parlamentar) e podemos ver inicialmente um bom "fit" da reta de regressão nos dados, vamos aos números.
 
 ```{r}
@@ -154,13 +157,20 @@ atividade_twitter = atividade_twitter %>% filter(log_engaj_mediano != -Inf)
 
 modelo_mediano <- lm(log_engaj_mediano ~ log_n_proprio + log_seguidores + log_segue , 
           data = atividade_twitter)
-tidy(modelo_caracteristicas)
-glance(modelo_caracteristicas)
+tidy(modelo_mediano)
+glance(modelo_mediano)
 
 
 ```
 Agora temos o mesmo cenário, utilizar as características de um parlamentar para explicar uma variável, a única diferença é que nossa variável de interesse agora é o engajamento mediano, e não o total.
 
+Para essa variável, obtivemos o seguinte modelo:
+
+log10(Engajamento Mediano) = -1.13 + 0.1 * log10(n_proprio) + 0.7 * log10(seguidores) - 0.3 * log10(segue)
+
+R² = 0.523569
+
+Como podemos ver, para a variável Engajamento mediano, as características utilizadas a descrevem em 52%, o que por mais que seja um cenário bom, talvez ainda haja a necessidade de encontrar melhores variáveis para descrever esse engajamento em especifico. Concluimos então, que para as variáveis escolhidas como características de um parlamentar (seguidores, segue, tuites próprios), a melhor descrição obtida foi ao combiná-las a partir de uma regressão múltipla a fim de explicar o engajamento total.
 
 
 
